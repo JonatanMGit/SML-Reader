@@ -5,28 +5,11 @@
 #define OTETHERNET
 #include <ArduinoOTA.h>
 
-// Blue LED on the W5500-EVB-Pico
-#define LED_PIN 25
-
-/*
-W5500-EVB-Pico Pinout
-I/O	Pin Name	Description
-I	GPIO16	Connected to MISO on W5500
-O	GPIO17	Connected to CSn on W5500
-O	GPIO18	Connected to SCLK on W5500
-O	GPIO19	Connected to MOSI on W5500
-O	GPIO20	Connected to RSTn on W5500
-I	GPIO21	Connected to INTn on W5500
-I	GPIO24	VBUS sense - high if VBUS is present, else low
-O	GPIO25	Connected to user LED
-I	GPIO29	Used in ADC mode (ADC3) to measure VSYS/3
-
-https://docs.wiznet.io/Product/iEthernet/W5500/w5500-evb-pico/
-*/
-#define CS_PIN 17
+#include <config.h>
 
 // Random MAC address with the Wiznet OUI
 static byte mac[] = {0x00, 0x08, 0xDC, 0x4A, 0x2F, 0x7E};
+static byte ip[] = {192, 168, 178, 2}; // Set your own IP address
 
 EthernetServer server(80);
 
@@ -56,11 +39,12 @@ void PowerCurrUsageHandler()
 // OBIS handlers for Apator Picus ehz.060.d
 // Check your own meter for the correct OBIS values
 OBISHandler OBISHandlers[] = {
-    {{0x01, 0x00, 0x01, 0x08, 0x00, 0xff}, &PowerInHandler},  /* 1-0:1.8.0*255 kWh */
-    {{0x01, 0x00, 0x02, 0x08, 0x00, 0xff}, &PowerOutHandler}, /* 1-0:2.8.0*255 kWh */
-    {{0x01, 0x00, 0x10, 0x07, 0x00, 0xff}, &PowerCurrUsageHandler},
+    {{0x01, 0x00, 0x01, 0x08, 0x00, 0xff}, &PowerInHandler},        /* 1.8.0 */
+    {{0x01, 0x00, 0x02, 0x08, 0x00, 0xff}, &PowerOutHandler},       /* 2.8.0 */
+    {{0x01, 0x00, 0x10, 0x07, 0x00, 0xff}, &PowerCurrUsageHandler}, /* 16.7.0 */
+    {0, 0}
 
-    {{0, 0}}};
+};
 
 void setup()
 {
@@ -80,18 +64,9 @@ void setup()
     Ethernet.init(CS_PIN);
 
     // start the Ethernet connection and check if DHCP succeeds
-    if (Ethernet.begin(mac) == 0)
-    {
-        // blink the led 5 times if DHCP fails
-        for (int i = 0; i < 5; i++)
-        {
-            digitalWrite(LED_PIN, HIGH);
-            delay(100);
-            digitalWrite(LED_PIN, LOW);
-            delay(100);
-        }
-    }
-    ArduinoOTA.begin(Ethernet.localIP(), "w5500-evb-pico", "had!J89H", InternalStorage);
+    Ethernet.begin(mac, ip);
+
+    ArduinoOTA.begin(Ethernet.localIP(), DEVICE_NAME, OTA_PASSWORD, InternalStorage);
 
     server.begin();
 
@@ -106,7 +81,8 @@ void readByte(unsigned char currentChar)
     if (currentState == SML_START)
     {
         // reset values
-        WhIn = WhOut = Curr = -2;
+        // WhIn = WhOut = Curr = -2;
+        return;
     }
     else if (currentState = SML_LISTEXTENDED)
     {
@@ -119,18 +95,24 @@ void readByte(unsigned char currentChar)
         {
             OBISHandlers[iHandler].Handler();
         }
+
+        return;
     }
     else if (currentState == SML_UNEXPECTED)
     {
         Serial.print(F(">>> Unexpected byte\n"));
+        return;
     }
     else if (currentState == SML_FINAL)
     {
         Serial.print(F(">>> Successfully received a complete message!\n"));
+
+        return;
     }
     else if (currentState == SML_CHECKSUM_ERROR)
     {
         Serial.print(F(">>> Checksum error.\n"));
+        return;
     }
 }
 
@@ -178,4 +160,5 @@ void loop()
     {
         readByte(Serial2.read());
     }
+    // Serial.println("Hello World");
 }
