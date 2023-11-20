@@ -20,3 +20,9 @@ https://docs.wiznet.io/Product/iEthernet/W5500/w5500-evb-pico/
 
 #define DEVICE_NAME "w5500-evb-pico"
 #define OTA_PASSWORD "had!J89H"
+
+#define MQTT_SERVER ""
+#define MQTT_PORT 1883
+#define MQTT_USER ""
+#define MQTT_PASSWORD ""
+#define MQTT_ID "w5500-evb-pico"

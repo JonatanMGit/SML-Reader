@@ -2,6 +2,8 @@
 #include <Ethernet.h>
 #include <sml.h>
 
+#include "PubSubClient.h"
+
 #define OTETHERNET
 #include <ArduinoOTA.h>
 
@@ -13,8 +15,12 @@ static byte ip[] = {192, 168, 178, 2}; // Set your own IP address
 
 EthernetServer server(80);
 
+EthernetClient ethClient;
+PubSubClient mqttClient(ethClient);
+
 // Store each OBIS value in a variable
 double WhIn, WhOut, Curr;
+double WhInOld, WhOutOld;
 typedef struct
 {
     const unsigned char OBIS[6];
@@ -26,14 +32,29 @@ sml_states_t currentState;
 void PowerInHandler()
 {
     smlOBISWh(WhIn);
+    if (WhIn > WhInOld && WhIn > 0)
+    {
+        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whin/state", String("{\"value\": " + String(WhIn) + "}").c_str());
+        WhInOld = WhIn;
+    }
 }
 void PowerOutHandler()
 {
     smlOBISWh(WhOut);
+    if (WhOut > WhOutOld && WhOut > 0 && WhOut < 100000)
+    {
+        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whout/state", String("{\"value\": " + String(WhOut) + "}").c_str());
+        WhOutOld = WhOut;
+    }
 }
 void PowerCurrUsageHandler()
 {
     smlOBISW(Curr);
+    // check if it isn't 256,512 1024 ... (as for some reason the meter sends these values)
+    if (Curr > 0 && Curr != 256 && Curr != 512 && Curr != 1024 && Curr != 768 && Curr < 10000)
+    {
+        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/curr/state", String("{\"value\": " + String(Curr) + "}").c_str());
+    }
 }
 
 // OBIS handlers for Apator Picus ehz.060.d
@@ -43,9 +64,13 @@ OBISHandler OBISHandlers[] = {
     {{0x01, 0x00, 0x01, 0x08, 0x00, 0xff}, &PowerInHandler},        /* 1.8.0 */
     {{0x01, 0x00, 0x02, 0x08, 0x00, 0xff}, &PowerOutHandler},       /* 2.8.0 */
     {{0x01, 0x00, 0x10, 0x07, 0x00, 0xff}, &PowerCurrUsageHandler}, /* 16.7.0 */
-    {0, 0}
 
 };
+
+void shutdown()
+{
+    mqttClient.disconnect();
+}
 
 void setup()
 {
@@ -68,11 +93,22 @@ void setup()
     Ethernet.begin(mac, ip);
 
     ArduinoOTA.begin(Ethernet.localIP(), DEVICE_NAME, OTA_PASSWORD, InternalStorage);
+    ArduinoOTA.beforeApply(shutdown);
 
     server.begin();
 
     Serial.print("My IP address: ");
     Serial.println(Ethernet.localIP());
+
+    // Set the MQTT server
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.connect(MQTT_ID, MQTT_USER, MQTT_PASSWORD);
+    mqttClient.setBufferSize(1024);
+
+    // Send out a Home Assistant MQTT discovery message for KwH in, out and current usage (retain = true)
+    mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whin/config", "{\"name\": \"Wh in\", \"state_topic\": \"homeassistant/sensor/w5500-evb-pico/whin/state\", \"unit_of_measurement\": \"Wh\", \"value_template\": \"{{ value_json.value }}\", \"device_class\": \"energy\", \"state_class\": \"total_increasing\", \"unique_id\": \"w5500-evb-pico_whin\"}", true);
+    mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whout/config", "{\"name\": \"Wh out\", \"state_topic\": \"homeassistant/sensor/w5500-evb-pico/whout/state\", \"unit_of_measurement\": \"Wh\", \"value_template\": \"{{ value_json.value }}\", \"device_class\": \"energy\", \"state_class\": \"total_increasing\", \"unique_id\": \"w5500-evb-pico_whout\"}", true);
+    mqttClient.publish("homeassistant/sensor/w5500-evb-pico/curr/config", "{\"name\": \"Current usage\", \"state_topic\": \"homeassistant/sensor/w5500-evb-pico/curr/state\", \"unit_of_measurement\": \"W\", \"value_template\": \"{{ value_json.value }}\", \"device_class\": \"power\", \"unique_id\": \"w5500-evb-pico_curr\"}", true);
 }
 
 void readByte(unsigned char currentChar)
@@ -107,7 +143,6 @@ void readByte(unsigned char currentChar)
     else if (currentState == SML_FINAL)
     {
         Serial.print(F(">>> Successfully received a complete message!\n"));
-
         return;
     }
     else if (currentState == SML_CHECKSUM_ERROR)
@@ -154,6 +189,7 @@ void webServer()
 void loop()
 {
     ArduinoOTA.poll();
+    mqttClient.loop();
     Ethernet.maintain();
     webServer();
     // Read Serial2 for SML messages
