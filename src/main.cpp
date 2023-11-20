@@ -38,6 +38,7 @@ void PowerCurrUsageHandler()
 
 // OBIS handlers for Apator Picus ehz.060.d
 // Check your own meter for the correct OBIS values
+// If you want to find codes print out the SML file in comma seperated HEX and use this Regex to find the codes: 0x01, 0x00, 0x[0-9a-fA-F]{2}, 0x[0-9a-fA-F]{2}, 0x00, 0x[0-9a-fA-F]{2}
 OBISHandler OBISHandlers[] = {
     {{0x01, 0x00, 0x01, 0x08, 0x00, 0xff}, &PowerInHandler},        /* 1.8.0 */
     {{0x01, 0x00, 0x02, 0x08, 0x00, 0xff}, &PowerOutHandler},       /* 2.8.0 */
