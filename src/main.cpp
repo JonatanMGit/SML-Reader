@@ -34,7 +34,7 @@ void PowerInHandler()
     smlOBISWh(WhIn);
     if (WhIn > WhInOld && WhIn > 0)
     {
-        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whin/state", String("{\"value\": " + String(WhIn) + "}").c_str());
+        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whin/state", String("{\"value\": " + String(WhIn, 1) + "}").c_str());
         WhInOld = WhIn;
     }
 }
@@ -43,7 +43,7 @@ void PowerOutHandler()
     smlOBISWh(WhOut);
     if (WhOut > WhOutOld && WhOut > 0 && WhOut < 100000)
     {
-        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whout/state", String("{\"value\": " + String(WhOut) + "}").c_str());
+        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/whout/state", String("{\"value\": " + String(WhOut, 1) + "}").c_str());
         WhOutOld = WhOut;
     }
 }
@@ -53,7 +53,7 @@ void PowerCurrUsageHandler()
     // check if it isn't 256,512 1024 ... (as for some reason the meter sends these values)
     if (Curr > 0 && Curr != 256 && Curr != 512 && Curr != 1024 && Curr != 768 && Curr < 10000)
     {
-        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/curr/state", String("{\"value\": " + String(Curr) + "}").c_str());
+        mqttClient.publish("homeassistant/sensor/w5500-evb-pico/curr/state", String("{\"value\": " + String(Curr, 0) + "}").c_str());
     }
 }
 
@@ -169,15 +169,15 @@ void webServer()
 
         client.print("<h1>Powermeter</h1>");
         client.print("<p>Power in: ");
-        client.print(WhIn);
+        client.print(WhIn, 1);
         client.print(" Wh</p>");
 
         client.print("<p>Power out: ");
-        client.print(WhOut);
+        client.print(WhOut, 1);
         client.print(" Wh</p>");
 
         client.print("<p>Power consumption: ");
-        client.print(Curr);
+        client.print(Curr, 0);
         client.print(" W</p>");
 
         client.print("</html>");
