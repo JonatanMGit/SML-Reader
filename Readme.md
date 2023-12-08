@@ -26,3 +26,5 @@ The advertised data depends on what's supported and configured in your Smart Met
 1. In main.cpp check your Ethernet Network and your OBIS Codes.
 1. Compile and upload the code to your W5500-EVB-Pico.
 1. Get data! (You can also use OTA now)
+
+More information about the configuration can be found on my [Blog](https://miarecki.eu/posts/ha-sml-electricity-meter/).
